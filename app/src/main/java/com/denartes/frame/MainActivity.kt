@@ -58,11 +58,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,7 +103,12 @@ class MainActivity : ComponentActivity() {
                     activity        = this,
                     onStartOverlay  = { startOverlayService() },
                     onStopOverlay   = { stopService(Intent(this, OverlayService::class.java)) },
-                    onSettingsChange = { startForegroundService(OverlayService.updateIntent(this)) }
+                    onSettingsChange = {
+                        // Start service if not running (preview mode), then update prefs.
+                        if (Settings.canDrawOverlays(this)) {
+                            startForegroundService(OverlayService.updateIntent(this))
+                        }
+                    }
                 )
             }
         }
@@ -132,22 +141,41 @@ private fun MainScreen(
     onSettingsChange: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var frameEnabled   by remember { mutableStateOf(false) }
     var borderColor    by remember { mutableStateOf(Color(BorderPrefs.colorArgb(context))) }
     var thickness      by remember { mutableFloatStateOf(BorderPrefs.thicknessDp(context)) }
     var cornerRadius   by remember { mutableFloatStateOf(BorderPrefs.radiusDp(context)) }
     var opacity        by remember { mutableFloatStateOf(BorderPrefs.opacity(context)) }
 
+    var glowEnabled    by remember { mutableStateOf(BorderPrefs.glowEnabled(context)) }
+    var glowColor      by remember { mutableStateOf(Color(BorderPrefs.glowColorArgb(context))) }
+    var glowStrength   by remember { mutableFloatStateOf(BorderPrefs.glowStrength(context)) }
+    var glowBlur       by remember { mutableFloatStateOf(BorderPrefs.glowBlurDp(context)) }
+    var glowSpread     by remember { mutableFloatStateOf(BorderPrefs.glowSpreadDp(context)) }
+    var glowOpacity    by remember { mutableFloatStateOf(BorderPrefs.glowOpacity(context)) }
+
     fun saveAndNotify() {
-        BorderPrefs.save(context, borderColor.toArgb(), thickness, cornerRadius, opacity)
-        if (frameEnabled) onSettingsChange()
+        BorderPrefs.save(
+            context, borderColor.toArgb(), thickness, cornerRadius, opacity,
+            glowEnabled, glowColor.toArgb(), glowStrength, glowBlur, glowSpread, glowOpacity
+        )
+        onSettingsChange()
     }
-    var glowEnabled    by remember { mutableStateOf(true) }
-    var glowColor      by remember { mutableStateOf(Color(0xFF00BCD4)) }
-    var glowStrength   by remember { mutableFloatStateOf(0.70f) }
-    var glowBlur       by remember { mutableFloatStateOf(25f) }
-    var glowSpread     by remember { mutableFloatStateOf(10f) }
-    var glowOpacity    by remember { mutableFloatStateOf(0.80f) }
+
+    // Start a preview overlay whenever the settings screen is visible so the
+    // user can see changes live without needing Frame to be "ON".
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> onSettingsChange()
+                Lifecycle.Event.ON_PAUSE  -> { if (!frameEnabled) onStopOverlay() }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -182,7 +210,8 @@ private fun MainScreen(
                 onToggle = { on ->
                     frameEnabled = on
                     if (on) {
-                        BorderPrefs.save(context, borderColor.toArgb(), thickness, cornerRadius, opacity)
+                        BorderPrefs.save(context, borderColor.toArgb(), thickness, cornerRadius, opacity,
+                            glowEnabled, glowColor.toArgb(), glowStrength, glowBlur, glowSpread, glowOpacity)
                         onStartOverlay()
                     } else {
                         onStopOverlay()
@@ -228,21 +257,21 @@ private fun MainScreen(
                     title    = "Glow",
                     subtitle = "Enable glow effect",
                     checked  = glowEnabled,
-                    onCheckedChange = { glowEnabled = it }
+                    onCheckedChange = { glowEnabled = it; saveAndNotify() }
                 )
                 SettingsDivider()
                 ColorRow(
                     title    = "Glow color",
                     subtitle = "Glow color",
                     color    = glowColor,
-                    onColorChange = { glowColor = it }
+                    onColorChange = { glowColor = it; saveAndNotify() }
                 )
                 SettingsDivider()
                 SliderRow(
                     title    = "Glow strength",
                     subtitle = "Intensity of the glow",
                     value    = glowStrength,
-                    onValueChange = { glowStrength = it },
+                    onValueChange = { glowStrength = it; saveAndNotify() },
                     valueRange = 0f..1f,
                     unit  = "%",
                     displayValue = { "${(it * 100).roundToInt()}%" }
@@ -252,7 +281,7 @@ private fun MainScreen(
                     title    = "Glow blur",
                     subtitle = "Softness of the glow",
                     value    = glowBlur,
-                    onValueChange = { glowBlur = it },
+                    onValueChange = { glowBlur = it; saveAndNotify() },
                     valueRange = 0f..100f,
                     unit  = "px",
                     steps = 99
@@ -262,7 +291,7 @@ private fun MainScreen(
                     title    = "Glow spread",
                     subtitle = "How far the glow extends",
                     value    = glowSpread,
-                    onValueChange = { glowSpread = it },
+                    onValueChange = { glowSpread = it; saveAndNotify() },
                     valueRange = 0f..50f,
                     unit  = "px",
                     steps = 49
@@ -272,7 +301,7 @@ private fun MainScreen(
                     title    = "Glow opacity",
                     subtitle = "Glow transparency",
                     value    = glowOpacity,
-                    onValueChange = { glowOpacity = it },
+                    onValueChange = { glowOpacity = it; saveAndNotify() },
                     valueRange = 0f..1f,
                     unit  = "%",
                     displayValue = { "${(it * 100).roundToInt()}%" }

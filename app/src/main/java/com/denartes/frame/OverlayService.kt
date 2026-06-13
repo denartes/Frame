@@ -47,6 +47,7 @@ class OverlayService : Service() {
             }
             ACTION_UPDATE -> {
                 overlayView.applyPrefs(this)
+                overlayView.visibility = View.VISIBLE
             }
             else -> {
                 // Fresh start or system restart (null intent)
