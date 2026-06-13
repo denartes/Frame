@@ -126,7 +126,6 @@ private fun MainScreen(
         BorderPrefs.save(context, borderColor.toArgb(), thickness, cornerRadius, opacity)
         if (frameEnabled) onSettingsChange()
     }
-    var inset          by remember { mutableFloatStateOf(0f) }
     var glowEnabled    by remember { mutableStateOf(true) }
     var glowColor      by remember { mutableStateOf(Color(0xFF00BCD4)) }
     var glowStrength   by remember { mutableFloatStateOf(0.70f) }
@@ -211,18 +210,6 @@ private fun MainScreen(
                     valueRange = 0f..1f,
                     unit  = "%",
                     displayValue = { "${(it * 100).roundToInt()}%" }
-                )
-                SettingsDivider()
-                EdgesRow()
-                SettingsDivider()
-                SliderRow(
-                    title    = "Inset",
-                    subtitle = "Distance from screen edge",
-                    value    = inset,
-                    onValueChange = { inset = it },
-                    valueRange = 0f..50f,
-                    unit  = "px",
-                    steps = 49
                 )
             }
 
@@ -472,37 +459,4 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onCheck
     )
 }
 
-@Composable
-private fun EdgesRow() {
-    SettingRowBase(
-        title    = "Edges",
-        subtitle = "Select which edges are visible",
-        trailing = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                EdgeButton(selected = true,  label = "⊟")
-                EdgeButton(selected = false, label = "⊞")
-                EdgeButton(selected = false, label = "◱")
-                EdgeButton(selected = false, label = "◲")
-            }
-        }
-    )
-}
 
-@Composable
-private fun EdgeButton(selected: Boolean, label: String) {
-    val bg     = if (selected) MaterialTheme.colorScheme.primaryContainer
-                 else MaterialTheme.colorScheme.surfaceVariant
-    val border = if (selected) MaterialTheme.colorScheme.primary
-                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(8.dp))
-            .clickable { }
-    ) {
-        Text(label, fontSize = 16.sp, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
