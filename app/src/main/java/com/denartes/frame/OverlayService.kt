@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
 import android.util.DisplayMetrics
@@ -20,12 +21,25 @@ class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var overlayView: BorderOverlayView
     private var isPaused = false
+    private lateinit var displayManager: DisplayManager
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            if (::overlayView.isInitialized) {
+                windowManager.updateViewLayout(overlayView, fullScreenParams())
+            }
+        }
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
+        displayManager.registerDisplayListener(displayListener, null)
         overlayView = BorderOverlayView(this)
         overlayView.applyPrefs(this)
         windowManager.addView(overlayView, fullScreenParams())
@@ -60,6 +74,9 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        if (::displayManager.isInitialized) {
+            displayManager.unregisterDisplayListener(displayListener)
+        }
         if (::overlayView.isInitialized) {
             windowManager.removeView(overlayView)
         }
