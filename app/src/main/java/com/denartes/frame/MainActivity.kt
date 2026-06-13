@@ -53,6 +53,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -540,6 +541,19 @@ private fun ColorWheelPickerDialog(
         ColorUtils.HSLToColor(floatArrayOf(hue, saturation, lightness))
     ).copy(alpha = alpha)
 
+    // Hex field state — kept in sync with pickedColor
+    fun Color.toHexString(): String {
+        val argb = this.toArgb()
+        return if (this.alpha < 1f)
+            String.format("%08X", argb)
+        else
+            String.format("%06X", argb and 0xFFFFFF)
+    }
+    var hexText by remember { mutableStateOf(pickedColor.toHexString()) }
+    // Keep hex field in sync when wheel/sliders change
+    val currentHex = pickedColor.toHexString()
+    if (hexText.uppercase() != currentHex) hexText = currentHex
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = MaterialTheme.colorScheme.surfaceContainer,
@@ -573,14 +587,48 @@ private fun ColorWheelPickerDialog(
                     endColor      = pickedColor.copy(alpha = 1f)
                 )
 
-                // Preview swatch
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(pickedColor)
-                )
+                // Preview swatch + hex input
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(pickedColor)
+                    )
+                    OutlinedTextField(
+                        value = hexText,
+                        onValueChange = { raw ->
+                            val cleaned = raw.trimStart('#').uppercase().filter { it.isLetterOrDigit() }.take(8)
+                            hexText = cleaned
+                            // Apply if 6 (RRGGBB) or 8 (AARRGGBB) hex chars
+                            if (cleaned.length == 6 || cleaned.length == 8) {
+                                try {
+                                    val parsed = java.lang.Long.parseLong(
+                                        if (cleaned.length == 6) "FF$cleaned" else cleaned, 16
+                                    ).toInt()
+                                    val c = Color(parsed)
+                                    val hsl = FloatArray(3)
+                                    ColorUtils.colorToHSL(parsed, hsl)
+                                    hue = hsl[0]; saturation = hsl[1]
+                                    val nat = 0.5f * hsl[1] + (1f - hsl[1])
+                                    darkness = if (nat > 0f) (hsl[2] / nat).coerceIn(0f, 1f) else 1f
+                                    alpha = c.alpha
+                                } catch (_: NumberFormatException) {}
+                            }
+                        },
+                        prefix = { Text("#", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 15.sp
+                        )
+                    )
+                }
             }
         },
         confirmButton = {
