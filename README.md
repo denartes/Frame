@@ -19,4 +19,4 @@ Most border apps on the Play Store use animation engines even for static borders
 
 ## License
 
-[Add license information here]
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
