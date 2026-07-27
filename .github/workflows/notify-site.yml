@@ -2,9 +2,10 @@ name: Notify website
 
 on:
   release:
-    - published
-    - edited
-    - deleted
+    types:
+      - published
+      - edited
+      - deleted
 
 jobs:
   notify:
