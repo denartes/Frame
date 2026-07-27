@@ -53,7 +53,7 @@ finally {
 }
 
 $apkSource = Join-Path $projectRoot "app\release\app-release.apk"
-$aabSource = Join-Path $projectRoot "app\release\app-release.aab"
+$aabSource = Join-Path $projectRoot "app\build\outputs\bundle\release\app-release.aab"
 
 if (-not (Test-Path $apkSource)) {
     throw "Release APK not found at: $apkSource"
