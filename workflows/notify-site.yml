@@ -1,0 +1,21 @@
+name: Notify website
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger website rebuild
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            repos/denartes/denartes.github.io/dispatches \
+            -f event_type=project-release \
+            -f client_payload[repository]="${{ github.repository }}" \
+            -f client_payload[tag]="${{ github.event.release.tag_name }}"
